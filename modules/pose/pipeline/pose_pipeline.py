@@ -58,8 +58,8 @@ class _Stage:
     """One built stage: what reaches it, what it emits to, and what the tick drives."""
     spec:          StageSpec
     track_ids:     list[int]
-    outputs:       Broadcast = field(default_factory=Broadcast)       # the app's frames callbacks
-    group_outputs: Broadcast = field(default_factory=Broadcast)       # the app's group callbacks
+    outputs:       Broadcast[[FrameDict]]                             # the app's frames callbacks
+    group_outputs: Broadcast[[GroupRecord]]                           # the app's group callbacks
     readers:       list[StageCallback] = field(default_factory=list)  # the stages that read this one
     window:        WindowTracker | None = None
     entry:         StageCallback | None = None                        # the first segment of the chain
@@ -263,7 +263,8 @@ class PosePipeline:
         if not track_ids:
             raise ValueError(f"pose stage {name} has no ids reaching it")
 
-        stage = _Stage(spec, track_ids, sources=sources)
+        stage = _Stage(spec, track_ids, Broadcast(name=f'pose stage {name} frames'),
+                       Broadcast(name=f'pose stage {name} group'), sources=sources)
         if spec.window is not None:
             stage.window = WindowTracker(track_ids, spec.window, features=spec.window_features)
 

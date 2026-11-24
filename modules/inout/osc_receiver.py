@@ -34,7 +34,7 @@ class OscReceiver:
 
     def __init__(self, settings: OscReceiverSettings) -> None:
         self.settings: OscReceiverSettings = settings
-        self._bindings: dict[str, Broadcast] = {}
+        self._bindings: dict[str, Broadcast[...]] = {}
         self._warned_unbound: set[str] = set()
         self._client_lock: Lock = Lock()
         self._return_client: SimpleUDPClient | None = None
@@ -79,7 +79,7 @@ class OscReceiver:
             logger.info(f"{address} {args}")
         self.settings.counter      = (self.settings.counter + 1) % 100000
         self.settings.last_address = address
-        callbacks: Broadcast | None = self._bindings.get(address)
+        callbacks: Broadcast[...] | None = self._bindings.get(address)
         if callbacks is not None:
             callbacks(*args)
         if self.settings.return_messages:

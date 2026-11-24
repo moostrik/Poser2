@@ -6,14 +6,6 @@ commit. Steps marked *owner* change another package: a minor fix, with that pack
 
 ## A. Broadcast
 
-A2. Every list typed and named. `pose_pipeline._Stage.outputs` becomes `Broadcast[[FrameDict]]` and `group_outputs`
-`Broadcast[[GroupRecord]]`; `osc_receiver._bindings` becomes `dict[str, Broadcast[...]]` (an address's arguments vary
-by message); `base_settings._callbacks` becomes `dict[str, Broadcast[[Any]]]`, since `bind()` calls each callback
-with the field's new value and the fields hold values of every type **(seen)**. The pose mixin's three lists and the
-pipeline's two get a name. *Owner: pose, inout, settings.*
-Why: an untyped `Broadcast` takes any call unchecked **(seen)**; a list without a name logs "Error in a broadcast
-callback", which says nothing about where **(seen**, the default name**)**. Check: pyright.
-
 A3. A stop clears its list with `clear()` instead of making a new `Broadcast`: smile `cam/camera.py`,
 `comfy/generator.py`, `face/face_finder.py`, `sequence/sequencer.py`. *Owner: smile.*
 Why: `clear()` (d0105e9a) replaced this way **(seen)**; a new list made while another thread adds a callback loses

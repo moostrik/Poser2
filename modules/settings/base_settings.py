@@ -20,6 +20,7 @@ class BaseSettings:
     # The class's fields and groups by name, base classes' first; a name a subclass declares again keeps the base's
     # place and takes the subclass's descriptor. Built once per class (`__init_subclass__`).
     _descriptors: ClassVar[dict[str, Field | Group]] = {}
+    _callbacks: dict[str, Broadcast[[Any]]]     # each field's bound callbacks, called with its new value
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
