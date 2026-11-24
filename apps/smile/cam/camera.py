@@ -113,7 +113,7 @@ class Camera:
         self._callbacks.add_callback(callback)
 
     def clear_frame_callbacks(self) -> None:
-        self._callbacks = Broadcast(name='camera frame')
+        self._callbacks.clear()
 
     def add_device_frame_callback(self, callback: CameraFrameCallback) -> None:
         """Every frame of the device as it came, on the device's thread, after the live path took it: the recorder's."""

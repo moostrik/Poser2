@@ -459,4 +459,4 @@ class Sequencer():
         self._message_callbacks.remove_callback(callback)
 
     def clear_message_callbacks(self) -> None:
-        self._message_callbacks = Broadcast(name='sequence message')
+        self._message_callbacks.clear()

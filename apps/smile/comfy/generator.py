@@ -128,7 +128,7 @@ class Generator(Thread):
         self._callbacks.add_callback(callback)
 
     def clear_message_callbacks(self) -> None:
-        self._callbacks = Broadcast(name='generator message')
+        self._callbacks.clear()
 
     # THREAD
     def run(self) -> None:

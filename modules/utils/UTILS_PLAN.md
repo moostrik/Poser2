@@ -6,11 +6,6 @@ commit. Steps marked *owner* change another package: a minor fix, with that pack
 
 ## A. Broadcast
 
-A3. A stop clears its list with `clear()` instead of making a new `Broadcast`: smile `cam/camera.py`,
-`comfy/generator.py`, `face/face_finder.py`, `sequence/sequencer.py`. *Owner: smile.*
-Why: `clear()` (d0105e9a) replaced this way **(seen)**; a new list made while another thread adds a callback loses
-that callback, where `clear()` takes the lock **(deduction)**. Check: smile's cam and sequence tests.
-
 A4. `PerformanceTimer._sample_callbacks` becomes a `ClassVar[Broadcast[[str, float, float]]]` named 'timer sample',
 and `has_sample_callbacks()` its `bool()`.
 Why: CLAUDE.md "A callback list is a `utils.Broadcast`"; it is a hand-written list **(seen)**. `add_time` and

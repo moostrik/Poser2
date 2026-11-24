@@ -222,4 +222,4 @@ class FaceFinder(Thread):
         self._callbacks.remove_callback(callback)
 
     def clear_frame_callbacks(self) -> None:
-        self._callbacks = Broadcast(name='face')
+        self._callbacks.clear()
