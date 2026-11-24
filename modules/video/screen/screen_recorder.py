@@ -367,7 +367,7 @@ class ScreenRecorder:
                 self._hold()        # the duration or the memory ends the take
             elif self._look_back and (not self.settings.record.look_back or self._format_wanted() != self._format
                                       or self.settings.record.duration != self._duration):
-                self._leave_look_back()     # off, or emptied and made again at the new size or duration
+                self._let_go()      # look back off, or emptied and made again at the new size or duration
             elif self._stop_requested.is_set():
                 self._hold()        # in look back too: the last seconds
         elif self._state == ScreenRecorderState.HELD:
@@ -438,9 +438,7 @@ class ScreenRecorder:
             self._look_back = look_back
             self._limit = limit
             self._target = target
-            self._written = 0
-            self._stamps = []
-            self._first = None
+            self._empty_take()
             self._complete = False
             self._reached = False
             self._dropped = 0
@@ -488,8 +486,7 @@ class ScreenRecorder:
             self._play_from = None
             return
         start, length = self._held_stamps[0], self._held_length()
-        mark_in, mark_out = sorted(self.settings.take.in_out)
-        low, high = start + mark_in * length, start + mark_out * length
+        low, high = self._in_out_moments()
         if self._play_from is None:
             moment = start + self._position * length
             self._play_from = (timestamp, moment if low <= moment < high else low)
@@ -502,12 +499,15 @@ class ScreenRecorder:
         """The held take's length by its frames' times (s)."""
         return self._held_stamps[-1] - self._held_stamps[0] if len(self._held_stamps) > 1 else 0.0
 
+    def _in_out_moments(self) -> tuple[float, float]:
+        """The held take's in and out as times of its frames (s)."""
+        start, length = self._held_stamps[0], self._held_length()
+        mark_in, mark_out = sorted(self.settings.take.in_out)
+        return start + mark_in * length, start + mark_out * length
+
     def _save_held(self) -> None:
         """Write the held frames whose times lie between in and out; the take stays held."""
-        start = self._held_stamps[0]
-        length = self._held_length()
-        mark_in, mark_out = sorted(self.settings.take.in_out)
-        low, high = start + mark_in * length, start + mark_out * length
+        low, high = self._in_out_moments()
         kept = [n for n, t in enumerate(self._held_stamps) if low - 1e-9 <= t <= high + 1e-9]
         if not kept:
             logger.warning('Screen recording: no frames between in and out, nothing saved')
@@ -523,9 +523,7 @@ class ScreenRecorder:
             self._ticks = 0
             with self._lock:
                 self._take_id += 1
-                self._written = 0
-                self._stamps = []
-                self._first = None
+                self._empty_take()
                 self._dropped = 0
                 self._accepting = True
             self._set_state(ScreenRecorderState.RECORDING)
@@ -534,11 +532,15 @@ class ScreenRecorder:
 
     def _let_go(self) -> None:
         """Have the thread free the store; the take ends there (`_finish`)."""
+        self._ask_free()
+        self._set_state(ScreenRecorderState.ENCODING)
+
+    def _ask_free(self) -> None:
+        """Take no more frames and have the thread free the store."""
         with self._wake:
             self._accepting = False
             self._free = True
             self._wake.notify()
-        self._set_state(ScreenRecorderState.ENCODING)
 
     def _hand_over(self, slots: list[int], stamps: list[float], free_after: bool) -> None:
         """Hand frames of the store, in their order, to the thread to encode into a new file."""
@@ -555,10 +557,6 @@ class ScreenRecorder:
             self._take = _Take(slots, stamps, str(path), self._format, self._dropped, free_after)
             self._wake.notify()
         self._set_state(ScreenRecorderState.ENCODING)
-
-    def _leave_look_back(self) -> None:
-        """Stop the look-back ring and have it freed; a new one starts after, if the switch is on."""
-        self._let_go()
 
     def _finish(self) -> None:
         """The thread is done with a take or a free: a saved part of a held take returns to it, else the take ends."""
@@ -580,10 +578,7 @@ class ScreenRecorder:
         if not self._error_logged:
             logger.error('Screen recorder: %s', message)
             self._error_logged = True
-        with self._wake:
-            self._accepting = False
-            self._free = True
-            self._wake.notify()
+        self._ask_free()
         self._capture_now = False
         self._set_state(ScreenRecorderState.ERROR)
 
@@ -777,8 +772,12 @@ class ScreenRecorder:
     def _free_store(self) -> None:
         self._store.clear()
         with self._lock:
-            self._written = 0
-            self._stamps = []
-            self._first = None
+            self._empty_take()
             self._complete = False
             self._reached = False
+
+    def _empty_take(self) -> None:
+        """No frame stored yet: their count and times start over; under the lock."""
+        self._written = 0
+        self._stamps = []
+        self._first = None

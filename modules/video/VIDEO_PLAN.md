@@ -5,11 +5,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 ## A. The screen recorder's thread and state
 
-A4. What the recorder does twice is written once: the in and out moments (`_play`, `_save_held`), the take's reset
-   (`_begin`, `_discard`, `_free_store`), the hand-over to free the store (`_fail` repeats `_let_go`), and
-   `_leave_look_back`, which only calls `_let_go`, goes **(seen)**. Why: Packages, "Inside a package, code that does
-   the same is written once". Check: `test_screen_recorder`.
-
 A5. `_Take` becomes a frozen `@dataclass` **(seen: a hand-written value class)**. Why: Settings, "Use `@dataclass` for
    plain value objects". Check: `test_screen_recorder`.
 
