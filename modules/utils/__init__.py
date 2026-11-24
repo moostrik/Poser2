@@ -6,11 +6,6 @@ from . import timing
 from .waker import Waker
 from .hot_reload_methods import HotReloadMethods, MethodType, MethodInfo
 from .smoothing import AngleFilter, EmaFilter, OneEuroFilter, SpringFilter
-from .interpolation import \
-    ScalarPredictiveHermite, \
-    VectorPredictiveHermite, \
-    ScalarPredictiveAngleHermite, \
-    VectorPredictiveAngleHermite
 from .geometry import Point2f, Quad, Rect, fill, fit
 from .lfo import lfo
 from .color import Color

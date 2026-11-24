@@ -5,16 +5,6 @@ Each step names its finding, **(seen)** in the code or a run, **(deduction)** wh
 or pyright is one commit. Steps marked *owner* change another package: a minor fix, with that package's thread asked
 for feedback.
 
-## D. Smoothing
-
-D2. `interpolation.py` goes, with its four exports from `__init__.py`.
-Why: its Hermite interpolators (scalar, vector, scalar angle, vector angle) predict a sampled signal between its
-samples, and pose's `nodes/_utils/array_predict.py` (`Predict`, `AnglePredict`, `PointPredict`, used by
-`predict_interpolators.py`) does that job for every pose feature **(seen)**; CLAUDE.md API evolution "Remove obsolete
-pathways". No commit since the history starts (2026-10-29) uses them outside utils **(seen**, `git log -G`**)**. The
-methods differ, a Hermite spline with smoothed velocity against a least-squares fit, so this removes a second way,
-not a copy. Check: pyright, utils tests.
-
 ## E. Document
 
 E1. UTILS.md's Waker section drops its list of the loops that wait on one, and keeps the measurements, the light
