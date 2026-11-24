@@ -7,19 +7,6 @@ fact)** what was told, **(seen)** what is read in the code.
 The recorder in the other apps is in their plans: [hd_trio's](../../apps/hd_trio/HD_TRIO_PLAN.md) A1,
 [white_space's](../../apps/white_space/WHITE_SPACE_PLAN.md) A1.
 
-## A. The player's readouts
-
-- A1. The playhead and `current_chunk` follow the frame shown. Now `_follow` sets `play_chunk` to the next chunk as
-  soon as it is loaded, while the ending chunk's frames still go out, and `update_gui` adds that chunk's start to the
-  shown frame's number (`player.py`, `_follow`, `update_gui`) **(seen)**; on `20261124-102304_Test` the playhead read
-  1:57 of 1:17.4 with `current_chunk` 1 while the image looped right **(site fact, 2026-11-24)**, and
-  `scripts/cadence_probe.py`, which waits on the playhead, measured nothing on 1–31 s and needed 61–91 **(seen)**.
-  How: `FrameHandOver` keeps camera 0's last (chunk, frame) gone out (its `_handed_over`), and `update_gui` reads
-  both from it; `play_chunk` stays the player's own. `FrameHandOver.shown_frame`, a frame number without its chunk,
-  then has no reader and goes in the same step; `_update_readouts`' guard on it becomes a guard on camera 0 having
-  handed over a frame. Why: the panel and the probe read where the recording is. Test: a player unit test with two
-  timed chunks, the playhead within the first chunk while the second is followed; the probe on 1–31 s.
-
 ## B. A stop during a split
 
 - B1. Proposed. Every camera's chunk `n` covers the same captures, a stop during a split included. What happens now:
@@ -56,4 +43,4 @@ The recorder in the other apps is in their plans: [hd_trio's](../../apps/hd_trio
 
 ## The rules it touches
 
-- Fix a problem where it is made, not where it shows: A1, B1
+- Fix a problem where it is made, not where it shows: B1

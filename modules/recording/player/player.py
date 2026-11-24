@@ -401,8 +401,9 @@ class Player(Thread):
 
     def _update_readouts(self) -> None:
         """On the player's thread: the panel's playback readouts, and the frames dropped since the play started."""
-        if self.hand_over.shown_frame >= 0:
-            self.update_gui(self.hand_over.shown_frame)
+        shown: tuple[int, int] | None = self.hand_over.handed_over(0)
+        if shown is not None:
+            self.update_gui(*shown)
         dropped: int = self.hand_over.take_dropped()
         if dropped:
             self.settings.dropped_frames += dropped
@@ -546,14 +547,13 @@ class Player(Thread):
             self.seek_target = value
         self._send(Message(MessageType.SEEK))
 
-    def update_gui(self, frame_id: int = 0) -> None:
-        """The panel's playhead and chunk, on the player's thread, at most 4 times a second: a settings write runs
-        its share propagation and callbacks on the writing thread, never a reader's."""
+    def update_gui(self, chunk: int, frame_id: int) -> None:
+        """The panel's playhead and chunk at camera 0's frame shown, on the player's thread, at most 4 times a second:
+        a settings write runs its share propagation and callbacks on the writing thread, never a reader's."""
         now: float = perf_counter()
         if now - self._gui_update_time < 0.25:
             return
         self._gui_update_time = now
-        chunk: int = self.get_current_chunk()
         self.settings.current_chunk = chunk
         timeline: Timeline = self._timeline()
         self.settings.playhead = [timeline.global_frame(chunk, frame_id) / self.fps, timeline.total / self.fps]

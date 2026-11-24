@@ -52,7 +52,6 @@ class FrameHandOver:
         self._handed_over: dict[int, tuple[int, int]] = {}  # each camera's last frame gone out: (chunk, frame)
         self._recorded: dict[int, float] = {}               # and its recorded capture time
         self._dropped: int = 0                      # frames dropped, unpaired or out of order, since taken
-        self.shown_frame: int = -1                  # camera 0's frame last gone out, for the panel
 
     def start(self, readers: HandOverReaders | None) -> None:
         """Hand over the frames of `readers`' chunk from here, and of no other; None hands over none."""
@@ -82,6 +81,11 @@ class FrameHandOver:
                 readers = self._readers[min(self._readers)]
         return readers.info(cam_id) if readers is not None else None
 
+    def handed_over(self, cam_id: int) -> tuple[int, int] | None:
+        """A camera's last frame gone out since the start, as (chunk, frame); None before one did."""
+        with self._lock:
+            return self._handed_over.get(cam_id)
+
     @property
     def drift(self) -> float:
         """How far apart the cameras' last frames gone out were captured, in ms."""
@@ -101,8 +105,6 @@ class FrameHandOver:
             readers: HandOverReaders | None = self._readers.get(chunk_id)
         if readers is None:
             return
-        if cam_id == 0 and stream == ChunkStream.VIDEO:
-            self.shown_frame = frame_id
         key: tuple[int, int] = (chunk_id, frame_id)
 
         with self._camera_locks[cam_id]:
