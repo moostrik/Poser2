@@ -135,8 +135,8 @@ class Player(Thread):
         self.hand_over: FrameHandOver = FrameHandOver(self.streams)
 
         self.playback_lock: Lock = Lock()
-        self.loop_callbacks: Broadcast[[]] = Broadcast(name='Player loop')
-        self.jump_callbacks: Broadcast[[]] = Broadcast(name='Player jump')
+        self._loop_callbacks: Broadcast[[]] = Broadcast(name='Player loop')
+        self._jump_callbacks: Broadcast[[]] = Broadcast(name='Player jump')
         self._gui_update_time: float = 0.0
 
         # Bind player settings callbacks
@@ -147,10 +147,6 @@ class Player(Thread):
         self.settings.bind(PlayerSettings.scrub, self._on_scrub)
         self.settings.bind(PlayerSettings.seek, self._on_seek)
         self.settings.bind(PlayerSettings.refresh, self._on_refresh_path)
-
-    @property
-    def frame_callbacks(self) -> Broadcast[[ClipFrame]]:
-        return self.hand_over.frame_callbacks
 
     def stop(self) -> None:
         self._set_play_chunk(-1)
@@ -292,13 +288,13 @@ class Player(Thread):
         self.hand_over.start(readers)
 
         if not runs_on:
-            self.jump_callbacks()
+            self._jump_callbacks()
 
         if readers is not None:
             readers.play()
 
         if readers is not None and readers.chunk == self._timeline().start_chunk and loop:
-            self.loop_callbacks()
+            self._loop_callbacks()
 
     def _follows(self) -> bool:
         """The one loading is the next chunk in the recording after the one playing: it starts as soon as it is
@@ -488,14 +484,14 @@ class Player(Thread):
         if self.running:
             logger.warning('Player: cannot add callback while it is running')
             return
-        self.hand_over.frame_callbacks.add_callback(callback)
+        self.hand_over.add_frame_callback(callback)
 
     def add_loop_callback(self, callback: LoopCallback) -> None:
         """Called on the player thread when playback starts at the in marker: keep it short."""
         if self.running:
             logger.warning('Player: cannot add callback while it is running')
             return
-        self.loop_callbacks.add_callback(callback)
+        self._loop_callbacks.add_callback(callback)
 
     def add_jump_callback(self, callback: JumpCallback) -> None:
         """Called on the player thread when playback starts somewhere that does not follow what played: a loop, a
@@ -503,7 +499,7 @@ class Player(Thread):
         if self.running:
             logger.warning('Player: cannot add callback while it is running')
             return
-        self.jump_callbacks.add_callback(callback)
+        self._jump_callbacks.add_callback(callback)
 
     # ── Settings callbacks ────────────────────────────────────────────
 

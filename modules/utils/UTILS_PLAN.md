@@ -1,28 +1,9 @@
 # Utils plan
 
-Proposed by the utils scan of 2026-11-22 (deep-flow at 3c7a387d), go 2026-11-24; what is here is not built yet. Each step names
-its finding, **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test or pyright is one
-commit. Steps marked *owner* change another package: a minor fix, with that package's thread asked for feedback.
-
-## A. Broadcast
-
-A8. A producer's `Broadcast` is private, and its typed boundary is `add_<noun>_callback(callback: <Noun>Callback)`
-(and `remove_...` where a consumer leaves before the producer stops), with the alias named where the item is made
-(`CameraFrameCallback`, `TrackletCallback`). The public lists, all of which but one already have the typed add
-method **(seen**, PC grep at b0b50437**)**:
-- the OAK-D and OAK4 cameras' `frame_callbacks` and `tracklet_callbacks`, the Vimba and webcam cameras'
-  `frame_callbacks`, and the replay camera's two (`recording/replay/camera.py`) become `_frame_callbacks` and
-  `_tracklet_callbacks`; the Vimba test that clears the list directly (`vimba/tests/test_camera.py`) clears the private
-  one;
-- the recording player's `loop_callbacks` and `jump_callbacks` become private;
-- `FrameHandOver.frame_callbacks` becomes private with an `add_frame_callback`; the player's `add_frame_callback` and
-  `test_frame_hand_over.py` add through it, and the player's `frame_callbacks` property, which hands out the hand
-  over's list, goes; its callers, not grepped yet, move to `add_frame_callback` (grepped at the build).
-Every other producer's list is private already and has its add method; `pose_pipeline._Stage`'s two lists are fields
-of a private class that `PosePipeline`'s add methods fill, so they stay. *Owner: camera, recording.*
-Why: the in and outputs are read at the boundary: a typed method with a named alias says what goes in and out without
-reading the `Broadcast` declaration, and keeps the list itself as the producer's own detail; asked 2026-11-22.
-Check: pyright, each touched package's tests.
+Proposed by the utils scan of 2026-11-22 (deep-flow at 3c7a387d), go 2026-11-24; what is here is not built yet.
+Each step names its finding, **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test
+or pyright is one commit. Steps marked *owner* change another package: a minor fix, with that package's thread asked
+for feedback.
 
 ## B. Geometry
 

@@ -80,8 +80,8 @@ class Camera(Thread):
         self.tracklet_fps: FPS = FPS()
 
         # CALLBACKS (run in registration order)
-        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='OAK-D frame')
-        self.tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name='OAK-D tracklets')
+        self._frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='OAK-D frame')
+        self._tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name='OAK-D tracklets')
 
         self.mount_readout: MountReadout = MountReadout(self.settings.readings, IMU_BOARD_ROLL)
 
@@ -153,8 +153,8 @@ class Camera(Thread):
             queue.close()
         self.queues.clear()
 
-        self.frame_callbacks.clear()
-        self.tracklet_callbacks.clear()
+        self._frame_callbacks.clear()
+        self._tracklet_callbacks.clear()
 
         logger.info(f'{self.device_id} CLOSED')
 
@@ -278,19 +278,19 @@ class Camera(Thread):
         none after `stop()`."""
         if not self.running:
             return
-        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
+        self._frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
                                          arrival=arrival))
 
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float, arrival: float) -> None:
         if not self.running:
             return
-        self.tracklet_callbacks(CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets,
+        self._tracklet_callbacks(CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets,
                                                 arrival=arrival))
 
     # ── CameraSource ───────────────────────────────────────────────────
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        self.frame_callbacks.add_callback(callback)
+        self._frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
-        self.tracklet_callbacks.add_callback(callback)
+        self._tracklet_callbacks.add_callback(callback)

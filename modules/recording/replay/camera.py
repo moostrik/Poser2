@@ -88,8 +88,8 @@ class Camera:
 
         self.video_fps: FPS = FPS()
         self.tracklet_fps: FPS = FPS()
-        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='replay frame')
-        self.tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name='replay tracklets')
+        self._frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='replay frame')
+        self._tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name='replay tracklets')
 
     # ── CameraSource ───────────────────────────────────────────────────
 
@@ -126,13 +126,13 @@ class Camera:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        self.frame_callbacks.add_callback(callback)
+        self._frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        self.tracklet_callbacks.add_callback(callback)
+        self._tracklet_callbacks.add_callback(callback)
 
     # ── Hand-over ──────────────────────────────────────────────────────
 
@@ -166,7 +166,7 @@ class Camera:
                             homography=homography, readings=readings, intrinsics=intrinsics, alignment=alignment, arrival=arrival,
                             confidence=clip.confidence, rotate90=info.rotate90 if info is not None else False,
                             flip_v=info.flip_v if info is not None else False)
-        self.frame_callbacks(frame)
+        self._frame_callbacks(frame)
         if frame_type == FrameType.VIDEO and metadata is not None:
             self._queue_recorded(metadata, timestamp)
 
@@ -248,4 +248,4 @@ class Camera:
         self.tracklet_fps.processed()
         self.readings.tracker_fps = self.tracklet_fps.get_rate_average()
         self.readings.tracklets = len(message.tracklets)
-        self.tracklet_callbacks(message)
+        self._tracklet_callbacks(message)

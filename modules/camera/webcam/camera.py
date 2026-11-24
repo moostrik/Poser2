@@ -28,7 +28,7 @@ class Camera(Thread):
         self.rotate90: bool = settings.rotate90     # how the camera is mounted, fixed at start
         self.index: int = index                 # the device's index for OpenCV
 
-        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='webcam frame')
+        self._frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='webcam frame')
         self.video_fps: FPS = FPS()
 
         self.running: bool = False
@@ -44,7 +44,7 @@ class Camera(Thread):
         return self._capture is not None
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        self.frame_callbacks.add_callback(callback)
+        self._frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         pass    # no detector on this camera: nothing to deliver
@@ -93,6 +93,6 @@ class Camera(Thread):
         self.video_fps.processed()
         self.settings.readings.video_fps = self.video_fps.get_rate_average()
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
-        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image,
+        self._frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image,
                                          timestamp=time.perf_counter(), rotate90=self.rotate90,
                                          flip_v=self.settings.flip_v, flip_h=self.settings.flip_h))

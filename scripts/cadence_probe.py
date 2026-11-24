@@ -49,8 +49,8 @@ STARTUP: float = 30.0       # s the app takes at most to load its models and sta
 
 
 class CallbackCamera(Protocol):
-    """A camera as every backend builds it, its frame callbacks a `Broadcast`."""
-    frame_callbacks: Broadcast[[CameraFrame]]
+    """A camera as every backend builds it, its frame callbacks a private `Broadcast` the probe swaps."""
+    _frame_callbacks: Broadcast[[CameraFrame]]
 
 
 def gaps(times: list[float]) -> dict:
@@ -102,7 +102,7 @@ def main() -> int:
     waits: dict[str, list[float]] = {}                  # per hand-over (timer name), ms
 
     camera = cast(CallbackCamera, app.cameras[0])
-    callbacks = camera.frame_callbacks
+    callbacks = camera._frame_callbacks
 
     def hand_over(frame: CameraFrame) -> None:
         start = time.perf_counter()
@@ -110,7 +110,7 @@ def main() -> int:
         if on.is_set() and frame.cam_id == 0 and frame.kind == FrameType.VIDEO:
             handover.append(start)
             camera_thread.append((time.perf_counter() - start) * 1000.0)
-    camera.frame_callbacks = Broadcast([hand_over], name='probe hand-over')
+    camera._frame_callbacks = Broadcast([hand_over], name='probe hand-over')
 
     def timed(kind: str, method):
         def wrapper(frame: CameraFrame) -> None:

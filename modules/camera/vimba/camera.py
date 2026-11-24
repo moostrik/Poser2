@@ -122,7 +122,7 @@ class Camera(Thread):
 
         self._last_frame: float = 0.0           # the arrival of the newest complete frame (perf_counter)
 
-        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='Vimba frame')
+        self._frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='Vimba frame')
 
         # frame rate, exposure, white balance and color: sent to the camera when the settings change, checked every frame
         self.control: SensorControl = SensorControl(settings)
@@ -144,7 +144,7 @@ class Camera(Thread):
         return self.camera is not None
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        self.frame_callbacks.add_callback(callback)
+        self._frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         pass    # no detector on this camera: nothing to deliver
@@ -283,6 +283,6 @@ class Camera(Thread):
 
     def _emit(self, image: np.ndarray, arrival: float) -> None:
         """The frame becomes the contract's: as delivered, its rotate90 and flips as flags, stamped with its arrival."""
-        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=arrival,
+        self._frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=arrival,
                                          rotate90=self.rotate90, flip_v=self.settings.flip_v,
                                          flip_h=self.settings.flip_h))

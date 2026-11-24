@@ -39,7 +39,7 @@ class FrameHandOverTest(unittest.TestCase):
         self.out: list[tuple[int, FrameType]] = []
         self.out_cams: list[tuple[int, int, int]] = []
         self.confidences: list[tuple[FrameType, int | None]] = []
-        self.hand_over.frame_callbacks.add_callback(self.on_frame)
+        self.hand_over.add_frame_callback(self.on_frame)
 
     def on_frame(self, clip: ClipFrame) -> None:
         self.confidences.append((clip.kind, None if clip.confidence is None else int(clip.confidence[0])))

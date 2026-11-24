@@ -42,8 +42,8 @@ from apps.white_space.settings import Stage  # noqa: E402
 
 
 class CallbackCamera(Protocol):
-    """A camera as every backend builds it, its frame callbacks a `Broadcast`."""
-    frame_callbacks: Broadcast[[CameraFrame]]
+    """A camera as every backend builds it, its frame callbacks a private `Broadcast` the probe swaps."""
+    _frame_callbacks: Broadcast[[CameraFrame]]
 
 
 STARTUP: float = 30.0       # s the app takes at most to load its models and start playing
@@ -106,7 +106,7 @@ def main() -> int:
 
     for source in app.cameras:
         camera = cast(CallbackCamera, source)
-        callbacks = camera.frame_callbacks
+        callbacks = camera._frame_callbacks
 
         def hand_over(frame: CameraFrame, callbacks=callbacks) -> None:
             start = time.perf_counter()
@@ -114,7 +114,7 @@ def main() -> int:
             if on.is_set() and frame.kind == FrameType.VIDEO:
                 camera_thread.setdefault(frame.cam_id, []).append((time.perf_counter() - start) * 1000.0)
                 frames.setdefault(frame.cam_id, []).append(start)
-        camera.frame_callbacks = Broadcast([hand_over], name='probe hand-over')
+        camera._frame_callbacks = Broadcast([hand_over], name='probe hand-over')
 
     def on_set(name: str) -> None:
         if on.is_set():

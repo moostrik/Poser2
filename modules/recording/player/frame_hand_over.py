@@ -16,7 +16,7 @@ from typing import Protocol
 
 from numpy import ndarray
 
-from modules.camera import ClipFrame, FrameType
+from modules.camera import ClipFrame, ClipFrameCallback, FrameType
 from modules.utils import Broadcast
 
 from ..chunk import ChunkInfo, ChunkStream, FrameMetadata
@@ -44,7 +44,7 @@ class FrameHandOver:
     def __init__(self, streams: list[ChunkStream]) -> None:
         """`streams`: in the order a frame's streams go out, VIDEO first."""
         self.streams: list[ChunkStream] = streams
-        self.frame_callbacks: Broadcast[[ClipFrame]] = Broadcast(name='Player frame')
+        self._frame_callbacks: Broadcast[[ClipFrame]] = Broadcast(name='Player frame')
         self._lock: Lock = Lock()                   # the chunks handed over and the counts
         self._camera_locks: dict[int, Lock] = defaultdict(Lock)     # one camera's frames out at a time, in order
         self._readers: dict[int, HandOverReaders] = {}      # the chunks whose frames go out, by number
@@ -52,6 +52,9 @@ class FrameHandOver:
         self._handed_over: dict[int, tuple[int, int]] = {}  # each camera's last frame gone out: (chunk, frame)
         self._recorded: dict[int, float] = {}               # and its recorded capture time
         self._dropped: int = 0                      # frames dropped, unpaired or out of order, since taken
+
+    def add_frame_callback(self, callback: ClipFrameCallback) -> None:
+        self._frame_callbacks.add_callback(callback)
 
     def start(self, readers: HandOverReaders | None) -> None:
         """Hand over the frames of `readers`' chunk from here, and of no other; None hands over none."""
@@ -132,5 +135,5 @@ class FrameHandOver:
             for stream in self.streams:
                 kind: FrameType | None = FRAME_TYPES.get(stream)
                 if kind is not None and stream in frames:
-                    self.frame_callbacks(ClipFrame(cam_id, kind, frames[stream], confidence if kind == FrameType.DEPTH else None,
+                    self._frame_callbacks(ClipFrame(cam_id, kind, frames[stream], confidence if kind == FrameType.DEPTH else None,
                                                    metadata, timestamp))
