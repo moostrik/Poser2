@@ -135,7 +135,7 @@ class _Take:
     """One encode: the store's slots in recorded order, their timestamps, the file, the frames' format, the frames
     left out, and whether the store is freed after it."""
     slots: list[int]
-    stamps: list[float]
+    timestamps: list[float]
     path: str
     format: ScreenFormat
     dropped: int
@@ -172,7 +172,7 @@ class ScreenRecorder:
         self._limit: float = 0.0            # s a take spans, by its frames' times; 0: until the memory stops it
         self._target: int = 0               # slots the store grows to; 0: as many as the memory holds
         self._written: int = 0              # frames stored since the store was emptied
-        self._stamps: list[float] = []      # each slot's frame's timestamp
+        self._timestamps: list[float] = []      # each slot's frame's timestamp
         self._first: float | None = None    # the take's first timestamp
         self._writing: int | None = None    # the slot a frame is being copied into
         self._complete: bool = False        # the store grows no more
@@ -197,7 +197,7 @@ class ScreenRecorder:
         self._shown_at: float = 0.0
         self._error_logged: bool = False
         self._held_slots: list[int] = []    # the held take's slots, oldest first
-        self._held_stamps: list[float] = [] # and their timestamps
+        self._held_timestamps: list[float] = [] # and their timestamps
         self._held_saved: bool = False      # a part of the held take is written
         self._saving_held: bool = False     # the thread writes a part of the held take
         self._paths: set[str] = set()       # the files handed to the thread, so no name is given twice
@@ -247,11 +247,11 @@ class ScreenRecorder:
     def preview_frame(self) -> tuple[int, np.ndarray] | None:
         """The held frame under the dragged marker, or at the play position, and its slot; None when neither; render
         thread."""
-        if self._state is not ScreenRecorderState.HELD or not (self._dragging or self._playing) or not self._held_stamps:
+        if self._state is not ScreenRecorderState.HELD or not (self._dragging or self._playing) or not self._held_timestamps:
             return None
-        moment = self._held_stamps[0] + self._position * self._held_length()
-        index = min(bisect_left(self._held_stamps, moment), len(self._held_stamps) - 1)
-        if index > 0 and moment - self._held_stamps[index - 1] < self._held_stamps[index] - moment:
+        moment = self._held_timestamps[0] + self._position * self._held_length()
+        index = min(bisect_left(self._held_timestamps, moment), len(self._held_timestamps) - 1)
+        if index > 0 and moment - self._held_timestamps[index - 1] < self._held_timestamps[index] - moment:
             index -= 1      # the nearer of the two frames around the moment
         slot = self._held_slots[index]
         return slot, self._store.frame(slot)
@@ -275,7 +275,7 @@ class ScreenRecorder:
         if self._state == ScreenRecorderState.RECORDING and not self._look_back:
             self._hold()
         if self._state == ScreenRecorderState.HELD and not self._held_saved:
-            self._hand_over(self._held_slots, self._held_stamps, free_after=True)
+            self._hand_over(self._held_slots, self._held_timestamps, free_after=True)
         with self._wake:
             self._exit.set()
             self._wake.notify()
@@ -451,7 +451,7 @@ class ScreenRecorder:
         out to be set on them; frames still on their way are let go, and a store without frames is freed."""
         with self._lock:
             self._accepting = False
-            written, stamps = self._written, list(self._stamps)
+            written, timestamps = self._written, list(self._timestamps)
             writing, look_back, limit = self._writing, self._look_back, self._limit
         slots = self._store.num_slots
         held = min(written, slots)
@@ -462,12 +462,12 @@ class ScreenRecorder:
             logger.warning('Screen recording has no frames, nothing held')
             self._let_go()
             return
-        held_stamps = [stamps[slot] for slot in order]
+        held_timestamps = [timestamps[slot] for slot in order]
         if look_back and limit:
-            newest = held_stamps[-1]
-            kept = [n for n, t in enumerate(held_stamps) if newest - t <= limit]
-            order, held_stamps = [order[n] for n in kept], [held_stamps[n] for n in kept]
-        self._held_slots, self._held_stamps = order, held_stamps
+            newest = held_timestamps[-1]
+            kept = [n for n, t in enumerate(held_timestamps) if newest - t <= limit]
+            order, held_timestamps = [order[n] for n in kept], [held_timestamps[n] for n in kept]
+        self._held_slots, self._held_timestamps = order, held_timestamps
         self._held_saved = False
         self._position = 0.0
         self.settings.take.in_out = [0.0, 1.0]
@@ -480,11 +480,11 @@ class ScreenRecorder:
         frame and play goes on from there. Only a held take plays; the switch goes off otherwise, a save included."""
         if self.settings.take.play and self._state is not ScreenRecorderState.HELD:
             self.settings.take.play = False
-        self._playing = self.settings.take.play and bool(self._held_stamps)
+        self._playing = self.settings.take.play and bool(self._held_timestamps)
         if not self._playing or self._dragging:
             self._play_from = None
             return
-        start, length = self._held_stamps[0], self._held_length()
+        start, length = self._held_timestamps[0], self._held_length()
         low, high = self._in_out_moments()
         if self._play_from is None:
             moment = start + self._position * length
@@ -496,27 +496,27 @@ class ScreenRecorder:
 
     def _held_length(self) -> float:
         """The held take's length by its frames' times (s)."""
-        return self._held_stamps[-1] - self._held_stamps[0] if len(self._held_stamps) > 1 else 0.0
+        return self._held_timestamps[-1] - self._held_timestamps[0] if len(self._held_timestamps) > 1 else 0.0
 
     def _in_out_moments(self) -> tuple[float, float]:
         """The held take's in and out as times of its frames (s)."""
-        start, length = self._held_stamps[0], self._held_length()
+        start, length = self._held_timestamps[0], self._held_length()
         mark_in, mark_out = sorted(self.settings.take.in_out)
         return start + mark_in * length, start + mark_out * length
 
     def _save_held(self) -> None:
         """Write the held frames whose times lie between in and out; the take stays held."""
         low, high = self._in_out_moments()
-        kept = [n for n, t in enumerate(self._held_stamps) if low - 1e-9 <= t <= high + 1e-9]
+        kept = [n for n, t in enumerate(self._held_timestamps) if low - 1e-9 <= t <= high + 1e-9]
         if not kept:
             logger.warning('Screen recording: no frames between in and out, nothing saved')
             return
         self._saving_held = True
-        self._hand_over([self._held_slots[n] for n in kept], [self._held_stamps[n] for n in kept], free_after=False)
+        self._hand_over([self._held_slots[n] for n in kept], [self._held_timestamps[n] for n in kept], free_after=False)
 
     def _discard(self) -> None:
         """Let the held take go: a look-back ring is emptied and records on, any other store is freed."""
-        self._held_slots, self._held_stamps = [], []
+        self._held_slots, self._held_timestamps = [], []
         self.settings.take.playhead = [0.0, 0.0]
         if self._look_back and self.settings.record.look_back:
             self._ticks = 0
@@ -541,10 +541,10 @@ class ScreenRecorder:
             self._free = True
             self._wake.notify()
 
-    def _hand_over(self, slots: list[int], stamps: list[float], free_after: bool) -> None:
+    def _hand_over(self, slots: list[int], timestamps: list[float], free_after: bool) -> None:
         """Hand frames of the store, in their order, to the thread to encode into a new file."""
-        stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-        name = f'{stamp}_{self.settings.take.name}' if self.settings.take.name else stamp
+        date_time = datetime.now().strftime('%Y%m%d-%H%M%S')
+        name = f'{date_time}_{self.settings.take.name}' if self.settings.take.name else date_time
         path = self._folder / f'{name}.mp4'
         part = 1
         while path.exists() or str(path) in self._paths:        # a second part saved within the same second
@@ -553,7 +553,7 @@ class ScreenRecorder:
         self._paths.add(str(path))
         with self._wake:
             self._accepting = False
-            self._take = _Take(slots, stamps, str(path), self._format, self._dropped, free_after)
+            self._take = _Take(slots, timestamps, str(path), self._format, self._dropped, free_after)
             self._wake.notify()
         self._set_state(ScreenRecorderState.ENCODING)
 
@@ -592,7 +592,7 @@ class ScreenRecorder:
         with self._lock:
             dropped = self._dropped
             first = self._first
-            last = max(self._stamps) if self._stamps else None
+            last = max(self._timestamps) if self._timestamps else None
         self.settings.record.dropped = dropped
         if self._state == ScreenRecorderState.HELD:
             length = self._held_length()
@@ -690,10 +690,10 @@ class ScreenRecorder:
                 self._writing = None
                 if not self._accepting or self._take_id != take_id:
                     return
-                if slot < len(self._stamps):
-                    self._stamps[slot] = frame.timestamp
+                if slot < len(self._timestamps):
+                    self._timestamps[slot] = frame.timestamp
                 else:
-                    self._stamps.append(frame.timestamp)
+                    self._timestamps.append(frame.timestamp)
                 self._written = written + 1
                 if self._first is None:
                     self._first = frame.timestamp
@@ -746,9 +746,9 @@ class ScreenRecorder:
         """Encode the take at the rate it was recorded at; whether the file is written."""
         started = time.perf_counter()
         count = len(take.slots)
-        span = take.stamps[-1] - take.stamps[0] if count > 1 else 0.0
+        span = take.timestamps[-1] - take.timestamps[0] if count > 1 else 0.0
         fps = (count - 1) / span if span > 0.0 else self._fps / max(1, self._frame_step)
-        gaps = np.diff(np.asarray(take.stamps)) if count > 1 else np.zeros(1)
+        gaps = np.diff(np.asarray(take.timestamps)) if count > 1 else np.zeros(1)
         comment = (f'frames {count}, fps {fps:.3f}, mean gap {gaps.mean() * 1000:.2f} ms, '
                    f'worst gap {gaps.max() * 1000:.2f} ms, dropped {take.dropped}')
         ok = False
@@ -778,5 +778,5 @@ class ScreenRecorder:
     def _empty_take(self) -> None:
         """No frame stored yet: their count and times start over; under the lock."""
         self._written = 0
-        self._stamps = []
+        self._timestamps = []
         self._first = None

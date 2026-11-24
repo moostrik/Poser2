@@ -3,12 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## C. Names
-
-C2. A time stamp is `timestamp` in `screen_recorder.py`: `stamps`, `_stamps`, `held_stamps`, `_held_stamps`,
-   `_Take.stamps` become `timestamps`, `_timestamps`, ... **(seen)**. Why: glossary, "A time stamp: `timestamp`".
-   Check: `test_screen_recorder`.
-
 ## D. Text
 
 D1. `record.state`'s description names ERROR too; `ScreenFrameStore`'s docstring drops "cleared by one thread" (the
