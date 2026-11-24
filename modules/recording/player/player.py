@@ -175,6 +175,10 @@ class Player(Thread):
         folder = self.settings.folder
         if folder and folder in self.folders:
             self.play(True, folder, prepare=True)
+        elif folder:
+            logger.warning(f"The player's folder '{folder}' is not in {self.data_path}/{self.settings.video_path}: nothing plays until one is picked")
+        else:
+            logger.warning("The player's folder is not set in the settings file: nothing plays until one is picked")
 
         while self.running:
             try:
