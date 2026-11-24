@@ -10,11 +10,15 @@ and smile, `vimba` and `webcam` by smile. That is general code with one user, wh
 
 ## Open
 
-- Where the OAK-D's 1.1% clip loss is made. The recording thread saw about 1.1% of the clip frames lost in white_space
-  -sim with four cameras (recording 20261124-110331_probe_F1) **(site fact)**. It is not the host's clip queue: over
-  that whole recording, `studio.json` with `replay` false, `dropped_clips` is 0 on all four cameras, each about 1,133
-  frames back, video latency 35 ms and tracker latency 119 ms (2026-11-24) **(seen)**. What was counted as lost, and
-  against what, is to be asked of the recording thread before anything is changed.
+- Where the OAK-D's 1.1% clip loss is made. The recording thread counted about 4,104 frames sent per OAK-D and 4,060
+  back over 180 s of white_space -sim (recording 20261124-110331_probe_F1, about three loops) **(site fact)**, and
+  guessed the frames in flight at each loop jump are lost. Between the clip input's send and the camera's video
+  callback nothing is lost, at the loop jumps included: over 181 s, three loops, `studio.json` with `replay` false and
+  `CLIP_QUEUE_SIZE` 1, each camera's frames sent equal its frames back (4,159, 4,160, 4,160, 4,156), `dropped_clips`
+  is 0, every 4 s window around a jump has as many back as sent within the one in flight, video latency 35 ms and
+  tracker latency 119 ms (2026-11-24) **(seen)**. The loss is counted after the camera's hand-over or before the
+  send; where the recording thread counted, and against what, is to be asked before anything is changed. The
+  simulator's `playhead` steps back about 9.4 s every 10 s of play, outside the loops **(seen, cause not checked)**.
 - The OAK4 is to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is
   the only alignment on the camera and fattens near objects ([Depth](oak4/OAK4.md#depth)), and its firmware cannot be
   changed. The options are to keep sending raw depth with its `DepthAlignment` to a PC that runs `DepthAlign`, or to
