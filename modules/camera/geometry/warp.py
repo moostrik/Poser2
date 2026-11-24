@@ -1,7 +1,9 @@
-"""The warp from the sensor's frame to the delivered one: its mesh, and the rows it covers per column."""
+"""The warp from the sensor's frame to the delivered one: its mesh, the rows it covers per column, and the keystone's
+mesh."""
 
 import math
 
+import cv2
 import numpy as np
 
 from .frame_window import FrameWindow, frame_window
@@ -126,3 +128,29 @@ def coverage_summary(coverage: np.ndarray, out_size: tuple[int, int], mode_width
     return (f'rows covered of {out_h}: center {span([column(0.0)])}, '
             f'seams {span([column(-45.0), column(45.0)])}, '
             f'edges {span([0, out_w - 1])}')
+
+
+def keystone_mesh_points(
+    source_rect: tuple[float, float, float, float],
+    offset: float,
+    flip_h: bool,
+    flip_v: bool,
+    mesh_w: int,
+    mesh_h: int,
+) -> list[tuple[float, float]]:
+    """The keystone's mesh, row-major: the source pixel each output grid point reads, for an output the size of
+    `source_rect` (x, y, width, height) whose top edge is `offset` px narrower on each side and bottom edge as much
+    wider, flipped as asked; the corners' homography, sampled on a `mesh_w` x `mesh_h` grid."""
+    x, y, width, height = source_rect
+    corners: np.ndarray = np.array([[x, y], [x + width, y], [x + width, y + height], [x, y + height]], dtype=np.float32)
+    keystoned: np.ndarray = np.array([[offset, 0], [width - offset, 0], [width + offset, height], [-offset, height]],
+                                     dtype=np.float32)
+    if flip_h:
+        keystoned[:, 0] = width - keystoned[:, 0]
+    if flip_v:
+        keystoned[:, 1] = height - keystoned[:, 1]
+    to_source: np.ndarray = np.linalg.inv(cv2.getPerspectiveTransform(corners, keystoned))
+    grid_x, grid_y = np.meshgrid(np.linspace(0, width - 1, mesh_w), np.linspace(0, height - 1, mesh_h))
+    points: np.ndarray = to_source @ np.stack([grid_x.ravel(), grid_y.ravel(), np.ones(grid_x.size)])
+    points = points[:2] / points[2]
+    return [(float(px), float(py)) for px, py in points.T]

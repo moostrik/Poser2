@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from modules.camera.oak import Camera, ClipCamera, OakCameraSettings
 from modules.camera.oak import camera as oak_camera
-from modules.camera.oak import pipeline as oak_pipeline
+from modules.camera.oak import warp_mesh as oak_warp_mesh
 
 DEVICE_IDS: list[str] = ['A', 'B']
 
@@ -18,7 +18,7 @@ def settings(device_id: str, flip_h: bool) -> OakCameraSettings:
 class CameraPipelineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.meshes: list[list[tuple[float, float]]] = []
-        real_find_warp = oak_pipeline.find_warp
+        real_find_warp = oak_warp_mesh.find_warp
 
         def find_warp(*args, **kwargs):
             mesh = real_find_warp(*args, **kwargs)
@@ -26,7 +26,7 @@ class CameraPipelineTest(unittest.TestCase):
             return mesh
         for patcher in (patch.object(oak_camera, 'get_device_list', return_value=DEVICE_IDS),
                         patch.object(oak_camera.dai, 'Device', MagicMock()),
-                        patch.object(oak_pipeline, 'find_warp', find_warp)):
+                        patch.object(oak_warp_mesh, 'find_warp', find_warp)):
             patcher.start()
             self.addCleanup(patcher.stop)
 

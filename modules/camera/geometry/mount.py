@@ -1,9 +1,10 @@
 """How a rig camera is mounted and what its lens is, and what its open log says of both."""
 
+import math
 from dataclasses import dataclass
 
 from ..settings import RigCameraReadings
-from .lens import lens_deviation, lens_field
+from .lens import lens_deviation, lens_field, source_lens
 from .warp import coverage_summary, frame_coverage
 from .frame_window import frame_window
 
@@ -47,3 +48,23 @@ def lens_report(readings: RigCameraReadings, lens: tuple[float, float, float], s
     return (f'lens: field {field:.1f} deg across {src_size[0]} px, center offset '
             f'({cx - (src_size[0] - 1) / 2.0:+.1f}, {cy - (src_size[1] - 1) / 2.0:+.1f}) px; '
             f'{error:.2f} deg off the shared lens')
+
+
+def lens_reach_report(src_size: tuple[int, int], mode_width: int, mount: MountConfig) -> tuple[str, float] | None:
+    """Where the lens reaches less than half of `fov_h` on a side of its center, so the edge columns near the
+    horizon go black: one line for the open log and the black width (px); None when it reaches."""
+    if mount.lens_fov <= 0.0:
+        return None
+    focal, cx, _ = source_lens(src_size, mode_width, mount.fov_h, mount.lens_fov, mount.lens_center)
+    if focal <= 0.0:
+        return None
+    left: float = math.degrees(cx / focal)
+    right: float = math.degrees((src_size[0] - 1 - cx) / focal)
+    shortfall: float = mount.fov_h / 2.0 - min(left, right)
+    if shortfall <= 0.0:
+        return None
+    pixels: float = math.radians(shortfall) * mode_width / math.radians(mount.fov_h)
+    message: str = (f"fov {mount.fov_h:.1f} exceeds the lens reach ({left:.2f} deg left, {right:.2f} deg right "
+                    f"of its center): about {pixels:.1f} px black at the {'left' if left < right else 'right'} "
+                    f"edge near the horizon")
+    return message, pixels

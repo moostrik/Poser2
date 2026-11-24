@@ -148,7 +148,7 @@ bearing and elevation. With the window pinned at the bottom, the center column i
 top goes black toward the sides in an arch, because a sideways ray turned about the horizontal axis rises by less
 than the tilt. `frame_coverage` gives the covered rows per column, what the tracker and the panorama judge a raised
 arm near a seam against; a column at the very edge of the field can lose a pixel near the horizon where the lens's
-reach falls short of `fov`, which `_report_lens_reach` logs at open. The fixed point is the lens's center: the
+reach falls short of `fov`, which `lens_reach_report` gives the open log. The fixed point is the lens's center: the
 center column at the row of elevation `tilt` reads `(cx, cy)`, so at tilt 0 the warp is not the identity but the
 equidistant to cylindrical reprojection.
 
@@ -261,7 +261,7 @@ reads it. The node is always created; a board without an IMU never sends, and th
 
 **Tilt or keystone.** A camera uses one correction. The warp ([the warp](#the-warp)) makes a column one azimuth,
 also at tilt 0, where it is the equidistant to cylindrical reprojection. The keystone (`keystone`, a fraction of the
-frame) is a homography that pins the output's four corners to the frame's: a rotation composed with a stretch to
+frame, `keystone_mesh_points` in `geometry/warp.py`) is a homography that pins the output's four corners to the frame's: a rotation composed with a stretch to
 fit, the wrong model for re-aiming a wide lens but what hd_trio relies on, a player seen from a down-tilted camera
 in normal proportions with the whole frame kept. Its mesh is 2 x 64: two columns, since the map is affine in x per
 row, and 64 rows for the vertical curve; it does not change without the installations that use it. The two are
@@ -305,8 +305,8 @@ whatever blob is in use. The input size is read off the blob, so a file name and
 |                      | `depth_projection`, `mount` (`MountConfig`, the open log's frame and lens lines)             |
 | `oak_device/`        | what an OAK reports through depthai, for both OAKs: `capture_clock` (a message's capture and |
 |                      | latency), `calibration` (lens, IMU extrinsics), `sensors`, `tracklets` (`TRACKING_STATUS`)   |
-| `oak/`               | the OAK-D: `camera`, `clip_camera`, `control`, `pipeline`, `settings`, `sensor`, `device`,   |
-|                      | `imu`, `models`                                                                              |
+| `oak/`               | the OAK-D: `camera`, `clip_camera`, `control`, `pipeline`, `warp_mesh`, `settings`, `sensor`,  |
+|                      | `device`, `imu`, `models`                                                                    |
 | `oak4/`              | the OAK4: `camera`, `control`, `pipeline`, `settings`, `sensor`, `device`, `imu`,            |
 |                      | `messages`, `models`, `keypoint_join`                                                        |
 | `vimba/`, `webcam/`  | the Mako over GigE, the PC's own camera                                                      |

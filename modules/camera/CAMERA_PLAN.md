@@ -21,26 +21,6 @@ through the camera's own models. **(seen)** is read in the code, **(deduction)**
 
 ## I. The scan of 2026-11-22 evening
 
-- I1. The OAK-D's warp meshes in a file of their own, the keystone written once. Why: "Its files each hold one class
-  or one subject" and "Inside a package, code that does the same is written once" (CLAUDE.md, Packages).
-  `oak/pipeline.py` holds the pipeline and, under its own banners, the meshes: `find_warp`, `clip_warp_mesh`,
-  `find_keystone_warp`, `find_keystone_warp_square`, `_report_lens_reach`, `build_warp_mesh` **(seen)**. The two
-  keystone functions are one computation, a corner homography sampled on a grid, for a source rectangle of the whole
-  frame or of the centered square; they differ only in that rectangle **(seen)**. Their parameters have no types, and
-  they map the grid point by point in a Python loop **(seen)**. The keystone and the lens reach are geometry without
-  depthai, as `geometry/warp.py`'s `warp_mesh_points` is, whose points `oak4/pipeline.py` only converts **(seen)**.
-  How: one `keystone_mesh_points(source_rect, size, offset, flip_h, flip_v, mesh_w, mesh_h)` in `geometry/warp.py`
-  replaces the two, typed, the grid mapped in one numpy product, its points a numpy array; `_report_lens_reach` moves
-  to `geometry/mount.py` as `report_lens_reach`, beside `lens_report`, as a report on the lens. `oak/warp_mesh.py` takes `find_warp`, `clip_warp_mesh` and `build_warp_mesh`, the
-  meshes as depthai takes them: they only turn the geometry's points into `dai.Point2f`. `pipeline.py` imports
-  `build_warp_mesh` and `clip_warp_mesh`. Files: `oak/pipeline.py`, the new `oak/warp_mesh.py`, `geometry/warp.py`,
-  `geometry/mount.py`, `geometry/__init__.py`, `oak/tests/test_keystone_warp.py`, a new
-  `geometry/tests/test_keystone.py` and `oak/tests/test_camera_pipeline.py` (the import and the patch target). Test:
-  the keystone cases move to `geometry/tests/test_keystone.py`; their references and cases stay as they are, their
-  calls go to the one function, wide and square, each flip, exact in float32. What stays in
-  `oak/tests/test_keystone_warp.py` is `build_warp_mesh`'s selection, so it becomes `oak/tests/test_warp_mesh.py`, its
-  docstring saying what it tests now. Docs:
-  CAMERA.md, The warp (the keystone in `geometry`) and The package's parts (`oak/` lists `warp_mesh`).
 - I2. The color sensor's controls, written once for both OAKs. Why: "Inside a package, code that does the same is
   written once" (CLAUDE.md, Packages). Both OAKs deliver from a color sensor with the same controls: the OAK-D's
   `ColorSensorSettings` and the OAK4's `SensorSettings` hold the same ten fields, by name: exposure, ISO, auto
@@ -184,8 +164,8 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
 
 - Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1, J1
 - A callback only hands the item over and returns: J1
-- Its files each hold one class or one subject, named after it: I1, I3
-- Inside a package, code that does the same is written once: I1, I2
+- Its files each hold one class or one subject, named after it: I3
+- Inside a package, code that does the same is written once: I2
 - Use a `Protocol` for what a consumer needs from a collaborator, an `ABC` for a family of classes that share code: I2
 - Its `__init__.py` holds what other packages use: I3
 - Its tests sit in its `tests/` folder: I3
