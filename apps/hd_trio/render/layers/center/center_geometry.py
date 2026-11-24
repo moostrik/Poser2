@@ -198,9 +198,9 @@ class CenterGeometry(LayerBase):
 
         # Calculate anchor points in image space (full image coordinates)
         bbox = pose[BBox].to_rect()
-        anchor_top_img = shoulder_mid * bbox.size + bbox.position
-        anchor_bot_img = hip_mid * bbox.size + bbox.position
-        pin_img = pin_mid * bbox.size + bbox.position
+        anchor_top_img = shoulder_mid * bbox.size + bbox.top_left
+        anchor_bot_img = hip_mid * bbox.size + bbox.top_left
+        pin_img = pin_mid * bbox.size + bbox.top_left
 
         # Calculate camera-space geometry. Guard against a degenerate size
         # which would otherwise divide by zero when scaling.

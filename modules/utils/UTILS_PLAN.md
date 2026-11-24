@@ -3,14 +3,6 @@
 Proposed by the utils rescan of 2026-11-24 (deep-flow at 38929e26); not built. Each step names its finding,
 **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test or pyright is one commit.
 
-## C. Written once
-
-C1. `Point2f` and `Rect` lose their hand-written `__eq__`; the dataclass makes the same one. `Rect.position` and
-`Rect.top_left` are one property: `top_left` stays and the callers of `position` move (grepped at the build) **(seen**,
-`point.py:60`, `rect.py:38,53,63`**)**.
-Why: CLAUDE.md Packages "code that does the same is written once"; Naming "Use no synonyms for one concept". Check:
-test_geometry.
-
 ## D. Time
 
 D1. `time/timing.py`: `git_commit` reads the repo root as `parents[3]`, where it reads `parents[2]`, `modules/`, since

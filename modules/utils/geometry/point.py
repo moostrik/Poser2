@@ -57,12 +57,6 @@ class Point2f:
         else:
             return Point2f(self.x / other, self.y / other)
 
-    def __eq__(self, other: object) -> bool:
-        """Check if two points are equal."""
-        if not isinstance(other, Point2f):
-            return NotImplemented
-        return self.x == other.x and self.y == other.y
-
     @property
     def length(self) -> float:
         """Return the magnitude of the vector."""

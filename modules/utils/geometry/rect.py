@@ -35,25 +35,9 @@ class Rect:
         else:
             raise IndexError("Rect index out of range (0-3)")
 
-    def __eq__(self, other: object) -> bool:
-        """Check if two rectangles are equal."""
-        if not isinstance(other, Rect):
-            return NotImplemented
-        return (
-            self.x == other.x and
-            self.y == other.y and
-            self.width == other.width and
-            self.height == other.height
-        )
-
     def copy(self) -> "Rect":
         """Return a copy of this rectangle."""
         return Rect(x=self.x, y=self.y, width=self.width, height=self.height)
-
-    @property
-    def position(self) -> Point2f:
-        """Return the top-left corner as a Point2f."""
-        return Point2f(x=self.x, y=self.y)
 
     @property
     def size(self) -> Point2f:
