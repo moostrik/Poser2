@@ -34,6 +34,12 @@ Questions:
   settings live and `__del__` never runs (seen for `ArtNetBars` in the inout scan; for these six a **(deduction)**
   from the same mechanism). Check: the pose unit tests.
 
+## C. Smoothing
+
+- C1. Interpolation smoothness with poses on every other frame: the user saw it less smooth than before in deep_flow
+  -sim on `20261124-102304_Test`, and live not very smooth, the points sitting well **(site fact, 2026-11-24)**;
+  never tested with the one-frame skip. Check live and in -sim.
+
 ## D. The recorder's name
 
 - D1. The package's `Recorder` (HDF5 per stage, `recorder/recorder.py`) becomes `PoseRecorder`, and its
