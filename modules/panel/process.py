@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 from nicegui import Client, app as nicegui_app, core, ui
 
-from modules.logging import LogEntry, LogRingBuffer
+from modules.utils import LogEntry, LogRingBuffer
 from modules.settings import BaseSettings, Field, SettingsStore, Widget, mirror
 
 from .app_window import APP_QUERY, SELF_CLOSE_SCRIPT, open_app_window

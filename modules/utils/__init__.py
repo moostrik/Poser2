@@ -6,6 +6,7 @@ from . import timing
 from .waker import Waker
 from .smoothing import AngleFilter, EmaFilter, OneEuroFilter, SpringFilter
 from .geometry import Point2f, Quad, Rect, fill, fit
+from .logging import LogEntry, LogRingBuffer, crash_summary, get_log_buffer, install_excepthooks, setup_logging
 from .lfo import lfo
 from .color import Color
 from .object_pool import ObjectPool

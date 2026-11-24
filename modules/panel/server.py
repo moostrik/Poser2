@@ -21,7 +21,7 @@ import time
 from multiprocessing.connection import Client, Connection
 from typing import Any, Callable
 
-from modules.logging import get_log_buffer
+from modules.utils import get_log_buffer
 from modules.settings import BaseSettings, Field, SettingsStore, mirror
 
 logger = logging.getLogger(__name__)

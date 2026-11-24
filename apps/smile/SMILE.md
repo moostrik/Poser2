@@ -9,14 +9,14 @@ and 2 of its render). Paths in this file are relative to `apps/smile/`; commands
 its `.venv-oak4`, the depthai 3 venv the OAK4 needs (`scripts/install.bat oak4` there makes it, `apps/smile/scripts/install.bat`
 adds ComfyUI). Tests:
 `python -m unittest discover -s apps/smile/<package>/tests -t .` (`tests`, `face`, `comfy`, ..., `relay`).
-The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...); `modules/gl`, `modules/settings`,
-`modules/utils` and `modules/logging` are Poser2's, shared with the other apps. `data/` is what the installation
+The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...); `modules/gl`, `modules/settings`
+and `modules/utils` are Poser2's, shared with the other apps. `data/` is what the installation
 is given (settings files, models, workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
 `README.md` is for whoever installs or runs the installation: setup, scripts, the on-site checklist
 with the date each check passed, and the known limits.
 The app's rules are in [`smile.md`](../../.claude/rules/smile.md). It runs under pythonw, without a console: the log file
 in Poser2's `logs/` is the only place its messages show; unhandled exceptions of the threads and of the main
-thread go there too, `modules.logging.install_excepthooks`, and each one is a line in
+thread go there too, `modules.utils.install_excepthooks`, and each one is a line in
 `logs/crashes.log`, which every start reports as its first log line, `crash_summary`. ComfyUI's logs are in `output/logs/`.
 A worker thread that ended would leave an installation that looks alive and does nothing (the face finder: nobody is
 ever chosen; the generator: the flash stays), so its loop logs what its work raises (not at every round) and goes on.

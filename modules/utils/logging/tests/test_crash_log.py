@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from modules.logging import crash_log
+from .. import crash_log
 
 
 class TestCrashLog(unittest.TestCase):

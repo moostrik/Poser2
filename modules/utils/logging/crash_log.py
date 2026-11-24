@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 LOG_DIR = ROOT / "logs"
 CRASH_LOG = LOG_DIR / "crashes.log"     # one line per unhandled exception, across all starts and apps
 CRASH_LINE_LENGTH: int = 200

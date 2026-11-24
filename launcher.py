@@ -14,7 +14,7 @@ from threading import Event, Thread
 
 import psutil
 
-from modules.logging import setup_logging, install_excepthooks, crash_summary
+from modules.utils import setup_logging, install_excepthooks, crash_summary
 from modules.utils import timing
 from apps import APP_NAMES, load_app
 

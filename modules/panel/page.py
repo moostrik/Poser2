@@ -16,7 +16,7 @@ from typing import Callable, NamedTuple
 
 from nicegui import ui
 
-from modules.logging import LogRingBuffer
+from modules.utils import LogRingBuffer
 from modules.settings import BaseSettings, Field, Access, Group, SettingsStore, Widget
 
 from .controls import DEPTH_BG, ActionButton, Control, PinnedReadout, access_css_class, build_control, build_entry, generate_label

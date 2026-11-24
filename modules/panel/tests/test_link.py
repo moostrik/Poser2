@@ -7,7 +7,7 @@ import unittest
 from multiprocessing import Pipe
 from typing import Callable
 
-from modules.logging import LogRingBuffer
+from modules.utils import LogRingBuffer
 from modules.settings import BaseSettings, Field, Group, SettingsStore, Widget, mirror
 
 from ..process import AppLink

@@ -9,7 +9,7 @@ from typing import Callable
 
 from nicegui import ui
 
-from modules.logging import LogRingBuffer
+from modules.utils import LogRingBuffer
 
 logger = logging.getLogger(__name__)
 

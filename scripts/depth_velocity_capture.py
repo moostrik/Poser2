@@ -35,7 +35,7 @@ import numpy as np  # noqa: E402
 from OpenGL.GL import GL_FLOAT, GL_PACK_ALIGNMENT, GL_RGBA, GL_RGBA32F, GL_TEXTURE_2D, glBindTexture, glPixelStorei  # noqa: E402
 from OpenGL.raw.GL.VERSION.GL_1_1 import glGetTexImage as raw_get_tex_image  # noqa: E402
 
-from modules.logging import setup_logging, install_excepthooks  # noqa: E402
+from modules.utils import setup_logging, install_excepthooks  # noqa: E402
 from modules.gl import Fbo, BlendState, Texture  # noqa: E402
 from modules.flow import FlowUtil, LucasKanadeFlow3D  # noqa: E402
 from modules import render  # noqa: E402

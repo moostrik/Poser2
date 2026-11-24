@@ -37,11 +37,10 @@ import OpenGL  # noqa: E402
 OpenGL.ERROR_CHECKING = False
 import numpy as np  # noqa: E402
 
-from modules.logging import setup_logging, install_excepthooks  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
 from modules.render import Motion3DLayer, MotionInput  # noqa: E402
-from modules.utils import Broadcast, PerformanceTimer  # noqa: E402
+from modules.utils import Broadcast, PerformanceTimer, install_excepthooks, setup_logging  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
 from apps.deep_flow.settings import Stage  # noqa: E402
 

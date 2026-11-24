@@ -10,16 +10,6 @@ for feedback.
 utils holds small tools with no domain that many packages share, and imports nothing else of the project **(seen**:
 its files import only each other, the standard library and numpy**)**.
 
-F2. `modules/logging` moves into utils as `utils/logging/` (`crash_log.py`, `ring_buffer.py`, `setup.py`, its tests);
-`crash_log.ROOT` becomes `parents[3]`, one level deeper; every caller imports it from utils in the same change:
-`launcher.py`, the four probe scripts in `scripts/`, and the panel's `server.py`, `process.py`, `page.py`,
-`log_drawer.py` and `tests/test_link.py`; `test_ring_buffer.py` imports `ShortNameFormatter` relatively. SMILE.md's two
-lines that name `modules/logging` say utils. The root guard tests name no package and do not change **(seen**, PC grep
-at b0b50437; no app's main imports it**)**.
-Why: it became its own package in 8ce648e7, but log setup, the panel's log buffer and the crash log are shared tools
-with no domain, which is what utils is for, and `modules/` keeps one small package less, as asked 2026-11-22.
-Check: the logging tests, pyright, one app start that writes its log file.
-
 F3. The PC's `modules/oak` and `modules/tests` folders go: they hold only `__pycache__` folders, no code and nothing
 in git **(seen)**. No commit.
 
