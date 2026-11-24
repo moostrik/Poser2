@@ -3,13 +3,6 @@
 Proposed by the utils rescan of 2026-11-24 (deep-flow at 38929e26); not built. Each step names its finding,
 **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test or pyright is one commit.
 
-## B. Docstrings
-
-B1. Two docstrings that say the wrong thing: `geometry/point.py` `Point2f.is_zero` says "either coordinate", the code
-checks both; `logging/crash_log.py` `crash_summary` says "the first line of every log", it returns the count, the first
-date and the last line **(seen)**.
-Why: CLAUDE.md Docstrings "A docstring says what the thing is". Check: pyright.
-
 ## C. Written once
 
 C1. `Point2f` and `Rect` lose their hand-written `__eq__`; the dataclass makes the same one. `Rect.position` and

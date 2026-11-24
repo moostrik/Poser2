@@ -70,7 +70,7 @@ class Point2f:
 
     @property
     def is_zero(self) -> bool:
-        """Check if either coordinate is zero."""
+        """Whether both coordinates are zero."""
         return self.x == 0 and self.y == 0
 
     def normalized(self) -> "Point2f":

@@ -45,7 +45,7 @@ def read_crashes(path: Path | None = None) -> tuple[int, str | None, str | None]
 
 
 def crash_summary(path: Path | None = None) -> str:
-    """What the crash log holds since it was made: the first line of every log."""
+    """The crash log in one line: the number of crashes, the first one's date, the log's path and its last line."""
     path = path or CRASH_LOG
     count, since, last = read_crashes(path)
     if not count:
