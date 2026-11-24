@@ -6,9 +6,7 @@ import numpy as np
 
 
 class ScreenFrameStore:
-    """Slots of one frame shape, in numpy blocks of plain (pageable) RAM: a block allocates without locking any page,
-    and the memory goes back when the store is cleared. Blocks are added and the store cleared by one thread; a slot
-    is read on any."""
+    """Slots of one frame shape, in numpy blocks of plain RAM added one at a time; a slot is read on any thread."""
 
     def __init__(self) -> None:
         self._lock: Lock = Lock()

@@ -72,7 +72,7 @@ class ScreenRecorderRecordSettings(BaseSettings):
     look_back:    Field[bool]                = Field(False, widget=Widget.switch, description="Keep the last seconds all the time; Stop holds them")
     duration:     Field[float]               = Field(0.0, min=0.0, max=120.0, description="Recording length (s); 0 or above the maximum uses the maximum")
     ram_reserve:  Field[float]               = Field(8.0, min=1.0, max=64.0, description="RAM left free for Windows and the app (GB)")
-    state:        Field[ScreenRecorderState] = Field(ScreenRecorderState.IDLE, access=Field.READ, description="Idle, recording, held, encoding")
+    state:        Field[ScreenRecorderState] = Field(ScreenRecorderState.IDLE, access=Field.READ, description="Idle, recording, held, encoding or error")
     recorded:     Field[float]               = Field(0.0, access=Field.READ, description="Seconds in the store (s)")
     dropped:      Field[int]                 = Field(0, access=Field.READ, description="Frames of this take left out: no buffer free, or the queue full")
 
@@ -260,8 +260,9 @@ class ScreenRecorder:
         self._thread.start()
 
     def stop(self) -> None:
-        """Stop the recording: a take in progress is written up to its last stored frame, and a held take none of
-        whose parts is written yet is written whole; then the frames waiting are let go and the store freed."""
+        """Stop the recording: a take in progress is written up to its last stored frame, a look-back ring is not,
+        and a held take none of whose parts is written yet is written whole; then the frames waiting are let go and
+        the store freed."""
         self.settings.record.unbind(ScreenRecorderRecordSettings.start, self._on_start)
         self.settings.record.unbind(ScreenRecorderRecordSettings.stop, self._on_stop)
         self.settings.take.unbind(ScreenRecorderTakeSettings.save, self._on_save)

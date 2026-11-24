@@ -273,8 +273,7 @@ The show's first ticks after play are its ordinary ones. Four plays of 2 s, each
 | 3 s after play        | 16.1–22.1        | 37.6–64.5         | 1.5–35.0                  |
 | 3 s of show, no play  |                  | 33.2–35.7         | 13.9–17.5                 |
 
-The fluid's update is the CPU time of its GL calls; a long one waits on the GPU **(deduction)**. No tick in these
-four came near the single 99.6 ms tick an earlier run had once after play.
+The fluid's update is the CPU time of its GL calls; a long one waits on the GPU **(deduction)**.
 
 ### Look back
 
@@ -304,8 +303,8 @@ mean and the worst gap and the frames dropped go in the log line and the file's 
 | ERROR     | a failed capture or encode; only Start retries               |
 
 A failure (no ffmpeg, no NVENC, a capture that cannot be made) is logged once, shown as ERROR, and the show
-runs on. At exit a recording in progress is written up to its last stored frame, and a held take none of whose
-parts is written yet is written whole; the thread is joined, every frame is given back and the store freed, then the
+runs on. At exit a recording in progress is written up to its last stored frame, a look-back ring is not written,
+and a held take none of whose parts is written yet is written whole; the thread is joined, every frame is given back and the store freed, then the
 main thread frees the capture.
 
 ### Limits
